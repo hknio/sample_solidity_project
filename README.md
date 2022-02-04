@@ -1,2 +1,2 @@
-# sample_solidity_project
+# Sample Solidity Project
 This is the sample solidity project that can be used as an example of proper environment setup. 
