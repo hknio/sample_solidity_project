@@ -1,7 +1,7 @@
 # Sample Solidity Project
 This is the sample solidity project that can be used as an example of proper environment setup.
 
-#Project Status
+# Project Status
 The project is in progress. More info, documents, tests, and code will be added. 
 
 # Specs
