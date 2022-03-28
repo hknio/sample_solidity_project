@@ -2,6 +2,8 @@ pragma solidity 0.8.11;
 
 import "./interfaces/IERC20Detailed.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
 
 /**
  * @title TokenVesting
@@ -9,7 +11,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * typical vesting scheme, with a cliff and vesting period. Optionally revocable by the
  * owner.
  */
-contract TokenVesting is Ownable {
+contract TokenVesting is Ownable, AccessControl {
     event TokensReleased(address beneficiary, uint256 amount);
     event TokensLocked(address beneficiary, uint256 amount, uint256 paymentPlan);
 
@@ -17,6 +19,7 @@ contract TokenVesting is Ownable {
         uint256 periodLength;
         uint256 periods;
         uint256 cliff;
+        bool revoked;
     }
 
     struct Lock {
@@ -34,10 +37,31 @@ contract TokenVesting is Ownable {
     IERC20Detailed immutable token;
 
     mapping(address => Lock) public locks;
+    bytes32 public constant VESTING_ADMIN = keccak256("VESTING_ADMIN");
+
+    //Modifiers
+    modifier checkIfPaymentPlanHasEnded(PaymentPlan plan){
+        require(block.timestamp <= plan.periodLength, "Payment Period Completed"); 
+        _;
+    }
+    modifier checkIfPaymentPlanIsRevoked(PaymentPlan plan){
+        require(!plan.revoked, "Payment Plan has Already Revoked");
+        _;
+    }
 
     constructor(IERC20Detailed _token) {
         token = _token;
+        _setupRole(VESTING_ADMIN, msg.sender());
     }
+
+    // Prevent external ETH deposits to this contract 
+    receive() external payable {
+        revert();
+    }
+    fallback() external payable {
+        revert();
+    }
+
 
     function paymentPlansCount() external view returns (uint256) {
         return paymentPlans.length;
@@ -59,7 +83,7 @@ contract TokenVesting is Ownable {
         uint256 periodLength,
         uint256 periods,
         uint256 cliffPeriods
-    ) public onlyOwner {
+    ) public onlyRole(VESTING_ADMIN) {
         require(cliffPeriods <= periods, "TokenVesting: invalid cliff periods");
         paymentPlans.push(PaymentPlan(periodLength, periods, periodLength * cliffPeriods));
     }
@@ -76,7 +100,7 @@ contract TokenVesting is Ownable {
         uint256 amount,
         uint256 start,
         uint256 paymentPlan
-    ) public {
+    ) public  checkIfPaymentPlanHasEnded(paymentPlans[paymentPlan]) checkIfPaymentPlanIsRevoked(paymentPlans[paymentPlan]) {
         require(locks[beneficiary].beneficiary == address(0), "TokenVesting: already locked");
         require(beneficiary != address(0), "TokenVesting: beneficiary is the zero address");
         require(start > block.timestamp, "TokenVesting: final time is before current time");
@@ -96,7 +120,7 @@ contract TokenVesting is Ownable {
         return _releasableAmount(locks[beneficiary]);
     }
 
-    function release(address beneficiary) public {
+    function release(address beneficiary) public checkIfPaymentPlanIsRevoked(paymentPlans[locks[beneficiary].paymentPlan]){
         Lock storage lock = locks[beneficiary];
         uint256 unreleased = _releasableAmount(lock);
         require(unreleased > 0, "TokenVesting: no tokens available");
@@ -122,5 +146,13 @@ contract TokenVesting is Ownable {
             uint256 unlockedPercents = periodsPassed * (PERCENT_100 / paymentPlan.periods);
             return (lock.totalAmount * unlockedPercents) / PERCENT_100;
         }
+    }
+
+    /**
+    @notice Revokes the given payment plan
+    @param paymentPlanId - uint256 - paymentPlans index pf the payment plan
+    */
+    function revoke(uint256 paymentPlanId) external onlyRole(VESTING_ADMIN) checkIfPaymentPlanIsRevoked(paymentPlans[paymentPlan]){
+        paymentPlans[paymentPlanId].revoked = true;
     }
 }
