@@ -10,7 +10,7 @@ The project is in progress. More info, documents, tests, and code will be added.
 
 # Specs
 
-Are found in the [SPEC.md](./docs/Requirements.pdf) file
+Are found in the [Requirements.pdf](./docs/Requirements.pdf) file
 
 # Getting Started
 Recommended Node version si 16.0.0 and above.
