@@ -48,14 +48,14 @@ const config: HardhatUserConfig = {
             allowUnlimitedContractSize: true,
             accounts: accounts,
         },
-        mumbai: {
-            url: "https://rpc-mumbai.maticvigil.com",
-            chainId: 80001,
-            accounts: [secret],
-            gas: "auto",
-            gasPrice: 1000000000, // 1 gwei
-            gasMultiplier: 1.5,
-        },
+        // mumbai: {
+        //     url: "https://rpc-mumbai.maticvigil.com",
+        //     chainId: 80001,
+        //     accounts: [secret],
+        //     gas: "auto",
+        //     gasPrice: 1000000000, // 1 gwei
+        //     gasMultiplier: 1.5,
+        // },
         // rinkeby: {
         //   url: `https://rinkeby.infura.io/v3/${process.env.INFURA_API_KEY}`,
         //   accounts: [secret],

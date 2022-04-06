@@ -141,4 +141,7 @@ contract TokenVesting is Ownable, AccessControl {
     function setRevoked(uint256 paymentPlan, bool revoke) external onlyRole(VESTING_ADMIN) planNotRevoked(paymentPlan) {
         paymentPlans[paymentPlan].revoked = revoke;
     }
+    function getRevoked(uint256 paymentPlan) external view returns(bool){
+        return paymentPlans[paymentPlan].revoked;
+    }
 }
