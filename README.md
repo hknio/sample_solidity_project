@@ -1,19 +1,19 @@
 #NOTICE
-This project is not tend to be 100% secure, and we do not recommend using it in production.
-It's only an example of how Solidity project setup and documentation could look like.
+This project does not tend to be 100% secure, and we do not recommend using it in production.
+It is only an example of what Solidity project setup and documentation could look like.
 
 # Sample Solidity Project
-This is the sample solidity project that can be used as an example of proper environment setup.
+This is the sample solidity project that can be used as an example of a proper environment setup.
 
 # Project Status
-The project is in progress. More info, documents, tests, and code will be added.
+The project is in progress. More info, documents, tests, and code will be added. Docs Proofread is required.
 
 # Specs
 
 Are found in the [Requirements.pdf](./docs/Requirements.pdf) file
 
 # Getting Started
-Recommended Node version si 16.0.0 and above.
+Recommended Node version is 16.0.0 and above.
 
 ```bash
 $ npm install
@@ -40,7 +40,7 @@ Solidity smart contracts are found in `./contracts/`.
 Deploy script can be found in the `deploy.ts` folder.
 
 Add .env file to the project root.
-To add private key of a deployer account, assign following variable
+To add the private key of a deployer account, assign the following variable
 ```
 PRIVATE_KEY=...
 TOKEN_ADDRESS=...
