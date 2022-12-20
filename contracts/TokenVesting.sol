@@ -59,8 +59,6 @@ contract TokenVesting is Ownable, AccessControl {
     
     mapping(address => Lock) public locks;
 
-    IERC20Detailed public immutable token;
-
     bytes32 public constant VESTING_ADMIN = keccak256("VESTING_ADMIN");
 
     /**
@@ -181,14 +179,6 @@ contract TokenVesting is Ownable, AccessControl {
         _lock.released = _lock.released + unreleased;
         require(token.transfer(beneficiary, unreleased));
         emit TokensReleased(beneficiary, unreleased);
-    }
-
-    /**
-    @notice Revokes the given payment plan
-    @param paymentPlan - uint256 - paymentPlans index of the payment plan
-    */
-    function setRevoked(uint256 paymentPlan, bool revoke) external onlyRole(VESTING_ADMIN) planNotRevoked(paymentPlan) {
-        paymentPlans[paymentPlan].revoked = revoke;
     }
 
     /**
