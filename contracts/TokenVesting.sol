@@ -1,9 +1,10 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity 0.8.11;
 
 import "./interfaces/IERC20Detailed.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-
 
 /**
  * @title TokenVesting
@@ -12,7 +13,16 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  * owner.
  */
 contract TokenVesting is Ownable, AccessControl {
-
+    
+    /**
+     * @notice Payment plan details structure
+     * @param periodLength Length of each period, expressed in seconds
+     * @param periods Total vesting periods of the payment plan
+     * @param cliff Initial period for which no distribution will happen, expressed in 
+     * seconds. Tokens unlocked during this period will be available for release after the 
+     * cliff period has passed
+     * @param revoked True if the payment plan has been invalidated by administrators
+     */
     struct PaymentPlan {
         uint256 periodLength;
         uint256 periods;
@@ -20,6 +30,14 @@ contract TokenVesting is Ownable, AccessControl {
         bool revoked;
     }
 
+    /**
+     * @notice Lock structure. Keeps track of token distribution
+     * @param beneficiary Address that will receive the tokens once released
+     * @param start Unix timestamp at which point vesting starts
+     * @param paymentPlan Index of the payment plan in the array paymentPlans
+     * @param totalAmount Total amount of tokens to be distributed to beneficiary according to payment plan rules, measured in Wei
+     * @param released Amount of tokens already redistributed to beneficiary
+     */
     struct Lock {
         address beneficiary;
         uint256 start;
@@ -27,20 +45,49 @@ contract TokenVesting is Ownable, AccessControl {
         uint256 totalAmount;
         uint256 released;
     }
+    
 
+    /**
+     * @dev 100% with two extra digits for precision
+     */
     PaymentPlan[] public paymentPlans;
 
+    /**
+     * @dev Token to be vested
+     */
+    IERC20Detailed immutable token;
+    
     mapping(address => Lock) public locks;
 
     IERC20Detailed public immutable token;
 
     bytes32 public constant VESTING_ADMIN = keccak256("VESTING_ADMIN");
-    uint256 public constant PERCENT_100 = 100_00; // 100% with extra denominator
 
+    /**
+     * @dev 100% with two extra digits for precision
+     */
+    uint256 public constant PERCENT_100 = 100_00; 
+
+    /**
+     * @notice Emittedf when tokens have been released to beneficiary
+     * @param amount Released tokens expressed in Wei
+     * @param beneficiary Address receiving funds
+     */
     event TokensReleased(address beneficiary, uint256 amount);
+    
+    /**
+     * @notice Emitted when tokens have been locked
+     * @param amount Locked tokens expressed in Wei
+     * @param beneficiary Address tied to locked funds
+     * @param paymentPlan Index of the payment plan in the array paymentPlans
+     */
     event TokensLocked(address beneficiary, uint256 amount, uint256 paymentPlan);
-
+    
+    /**
+     * @dev Checks if the payment plan is still valid
+     */
     modifier planNotRevoked(uint256 paymentPlan){
+        require(paymentPlan <= paymentPlans.length - 1, "TokenVesting: invalid payment plan");
         require(!paymentPlans[paymentPlan].revoked, "Payment Plan has Already Revoked");
         _;
     }
@@ -50,21 +97,32 @@ contract TokenVesting is Ownable, AccessControl {
         _setupRole(VESTING_ADMIN, msg.sender);
     }
 
+    /**
+     * @notice Getter of payment plans count
+     * @dev Includes also revoked payment plans
+     * @return Number of payment plans set by the administrators
+     */
     function paymentPlansCount() external view returns (uint256) {
         return paymentPlans.length;
     }
 
+    /**
+     * @notice Getter of beneficiary's vesting process status
+     * @param beneficiary Target address to lookup
+     * @return Beneficiary's lock structure and the corresponding payment plan details
+     */
     function detailsOf(address beneficiary) external view returns (Lock memory, PaymentPlan memory) {
-        Lock storage lock = locks[beneficiary];
-        PaymentPlan storage plan = paymentPlans[lock.paymentPlan];
-        return (lock, plan);
+        Lock storage _lock = locks[beneficiary];
+        PaymentPlan storage plan = paymentPlans[_lock.paymentPlan];
+        return (_lock, plan);
     }
 
     /**
-     * @dev Add new payment plan.
-     * @param periodLength length of 1 period.
-     * @param periods total vesting periods.
-     * @param cliffPeriods number periods that will be scipped.
+     * @notice Add new payment plan.
+     * @dev Only for VESTING_ADMIN role
+     * @param periodLength length of 1 period expressed in seconds
+     * @param periods Total vesting periods
+     * @param cliffPeriods Number of initial periods for which no distribution will happen
      */
     function addPaymentPlan(
         uint256 periodLength,
@@ -76,11 +134,12 @@ contract TokenVesting is Ownable, AccessControl {
     }
 
     /**
-     * @dev lock tokens. Allowance should be set!!!
-     * @param beneficiary address of the beneficiary to whom vested tokens are transferred
-     * @param amount amount of tokens to lock
-     * @param start the time (as Unix time) at which point vesting starts
-     * @param paymentPlan payment plan to apply
+     * @notice Set up vesting process for a beneficiary
+     * @dev Allowance should be set!
+     * @param beneficiary Address of the beneficiary to whom vested tokens will be transferred once released
+     * @param amount Amount of tokens to lock, expressed in Wei
+     * @param start Unix timestamp at which point vesting starts
+     * @param paymentPlan Payment plan to apply. Index of the payment plan in the array paymentPlans
      */
     function lock(
         address beneficiary,
@@ -95,7 +154,6 @@ contract TokenVesting is Ownable, AccessControl {
             token.transferFrom(msg.sender, address(this), amount),
             "TokenVesting: transfer failed"
         );
-        require(paymentPlan <= paymentPlans.length - 1, "TokenVesting: invalid payment plan");
         locks[beneficiary].beneficiary = beneficiary;
         locks[beneficiary].start = start;
         locks[beneficiary].paymentPlan = paymentPlan;
@@ -103,15 +161,24 @@ contract TokenVesting is Ownable, AccessControl {
         emit TokensLocked(beneficiary, amount, paymentPlan);
     }
 
+    /**
+     * @notice Getter of funds that can be released for a given user
+     * @param beneficiary Address to lookup
+     * @return Funds that can be released, expressed in Wei
+     */
     function releasableAmount(address beneficiary) external view returns (uint256) {
         return _releasableAmount(locks[beneficiary]);
     }
 
+    /**
+     * @notice Function to release funds, if available
+     * @param beneficiary Address of the target user
+     */
     function release(address beneficiary) external {
-        Lock storage lock = locks[beneficiary];
-        uint256 unreleased = _releasableAmount(lock);
+        Lock storage _lock = locks[beneficiary];
+        uint256 unreleased = _releasableAmount(_lock);
         require(unreleased > 0, "TokenVesting: no tokens available");
-        lock.released = lock.released + unreleased;
+        _lock.released = _lock.released + unreleased;
         require(token.transfer(beneficiary, unreleased));
         emit TokensReleased(beneficiary, unreleased);
     }
@@ -124,23 +191,40 @@ contract TokenVesting is Ownable, AccessControl {
         paymentPlans[paymentPlan].revoked = revoke;
     }
 
-    function _releasableAmount(Lock storage lock) private view returns (uint256) {
-        return _vestedAmount(lock) - lock.released;
+    /**
+     * @notice Revokes the given payment plan
+     * @dev Only for VESTING_ADMIN role
+     * @param paymentPlan Index of the payment plan in the array paymentPlans
+    */
+    function setRevoked(uint256 paymentPlan, bool revoke) external onlyRole(VESTING_ADMIN) {
+        paymentPlans[paymentPlan].revoked = revoke;
     }
 
-    function _vestedAmount(Lock storage lock) private view returns (uint256) {
-        PaymentPlan storage paymentPlan = paymentPlans[lock.paymentPlan];
-        if (block.timestamp < lock.start + paymentPlan.cliff) {
+    /**
+     * @notice Getter of funds that can be released for a given user
+     * @param _lock Lock structure tied to the address to lookup
+     * @return Funds that can be released, expressed in Wei
+     */
+    function _releasableAmount(Lock storage _lock) private view returns (uint256) {
+        return _vestedAmount(_lock) - _lock.released;
+    }
+
+    /**
+     * @notice Getter of the vested amount for a given beneficiary user
+     * @param _lock Lock structure tied to the address to lookup
+     */
+    function _vestedAmount(Lock storage _lock) private view returns (uint256) {
+        PaymentPlan storage paymentPlan = paymentPlans[_lock.paymentPlan];
+        if (block.timestamp < _lock.start + paymentPlan.cliff) {
             return 0;
         } else if (
-            block.timestamp >= lock.start + (paymentPlan.periods * paymentPlan.periodLength)
+            block.timestamp >= _lock.start + (paymentPlan.periods * paymentPlan.periodLength)
         ) {
-            return lock.totalAmount;
+            return _lock.totalAmount;
         } else {
-            uint256 periodsPassed = (block.timestamp - lock.start) / paymentPlan.periodLength;
+            uint256 periodsPassed = (block.timestamp - _lock.start) / paymentPlan.periodLength;
             uint256 unlockedPercents = periodsPassed * (PERCENT_100 / paymentPlan.periods);
-            return (lock.totalAmount * unlockedPercents) / PERCENT_100;
+            return (_lock.totalAmount * unlockedPercents) / PERCENT_100;
         }
     }
-
 }
