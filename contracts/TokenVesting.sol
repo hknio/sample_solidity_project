@@ -12,7 +12,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  * owner.
  */
 contract TokenVesting is Ownable, AccessControl {
-    
+    event TokensReleased(address beneficiary, uint256 amount);
+    event TokensLocked(address beneficiary, uint256 amount, uint256 paymentPlan);
 
     struct PaymentPlan {
         uint256 periodLength;
@@ -29,16 +30,14 @@ contract TokenVesting is Ownable, AccessControl {
         uint256 released;
     }
 
-    PaymentPlan[] public paymentPlans;
-    mapping(address => Lock) public locks;
-    
-    bytes32 public constant VESTING_ADMIN = keccak256("VESTING_ADMIN");
     uint256 public constant PERCENT_100 = 100_00; // 100% with extra denominator
+
+    PaymentPlan[] public paymentPlans;
 
     IERC20Detailed immutable token;
 
-    event TokensReleased(address beneficiary, uint256 amount);
-    event TokensLocked(address beneficiary, uint256 amount, uint256 paymentPlan);
+    mapping(address => Lock) public locks;
+    bytes32 public constant VESTING_ADMIN = keccak256("VESTING_ADMIN");
 
     modifier planNotRevoked(uint256 paymentPlan){
         require(!paymentPlans[paymentPlan].revoked, "Payment Plan has Already Revoked");
@@ -116,14 +115,6 @@ contract TokenVesting is Ownable, AccessControl {
         emit TokensReleased(beneficiary, unreleased);
     }
 
-    /**
-    @notice Revokes the given payment plan
-    @param paymentPlan - uint256 - paymentPlans index of the payment plan
-    */
-    function setRevoked(uint256 paymentPlan, bool revoke) external onlyRole(VESTING_ADMIN) planNotRevoked(paymentPlan) {
-        paymentPlans[paymentPlan].revoked = revoke;
-    }
-
     function _releasableAmount(Lock storage lock) private view returns (uint256) {
         return _vestedAmount(lock) - lock.released;
     }
@@ -143,4 +134,11 @@ contract TokenVesting is Ownable, AccessControl {
         }
     }
 
+    /**
+    @notice Revokes the given payment plan
+    @param paymentPlan - uint256 - paymentPlans index of the payment plan
+    */
+    function setRevoked(uint256 paymentPlan, bool revoke) external onlyRole(VESTING_ADMIN) planNotRevoked(paymentPlan) {
+        paymentPlans[paymentPlan].revoked = revoke;
+    }
 }
