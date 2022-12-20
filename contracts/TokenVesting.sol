@@ -32,7 +32,7 @@ contract TokenVesting is Ownable, AccessControl {
 
     mapping(address => Lock) public locks;
 
-    IERC20Detailed immutable token;
+    IERC20Detailed public immutable token;
 
     bytes32 public constant VESTING_ADMIN = keccak256("VESTING_ADMIN");
     uint256 public constant PERCENT_100 = 100_00; // 100% with extra denominator
@@ -143,5 +143,4 @@ contract TokenVesting is Ownable, AccessControl {
         }
     }
 
-    
 }
