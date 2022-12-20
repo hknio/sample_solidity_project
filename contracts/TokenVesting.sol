@@ -48,26 +48,34 @@ contract TokenVesting is Ownable, AccessControl {
     
 
     /**
-     * @dev 100% with two extra digits for precision
+     * @dev array of PaymentPlan structs that holds the created payment plans.
      */
     PaymentPlan[] public paymentPlans;
 
+
     /**
-     * @dev Token to be vested
+     * @dev mapping that stores the Lock struct of each beneficiary address
      */
-    IERC20Detailed immutable token;
-    
     mapping(address => Lock) public locks;
 
-    bytes32 public constant VESTING_ADMIN = keccak256("VESTING_ADMIN");
-
+    /**
+     * @dev ERC20 address of the vesting token.
+     */
+    IERC20Detailed public immutable token;
+    
     /**
      * @dev 100% with two extra digits for precision
      */
     uint256 public constant PERCENT_100 = 100_00; 
 
     /**
-     * @notice Emittedf when tokens have been released to beneficiary
+     * @dev keccak256 hash of “VESTING_ADMIN”, representing a role of this same name for access control purposes.
+     */
+    bytes32 public constant VESTING_ADMIN = keccak256("VESTING_ADMIN");
+
+
+    /**
+     * @notice Emitted when tokens have been released to beneficiary
      * @param amount Released tokens expressed in Wei
      * @param beneficiary Address receiving funds
      */
@@ -85,11 +93,15 @@ contract TokenVesting is Ownable, AccessControl {
      * @dev Checks if the payment plan is still valid
      */
     modifier planNotRevoked(uint256 paymentPlan){
-        require(paymentPlan <= paymentPlans.length - 1, "TokenVesting: invalid payment plan");
+        require(paymentPlan <= paymentPlans.length - 1, "TokenVesting: invalid payment plan"); 
         require(!paymentPlans[paymentPlan].revoked, "Payment Plan has Already Revoked");
         _;
     }
 
+
+    /**
+     * @dev sets the vesting token address and the VESTING_ADMIN role
+     */
     constructor(IERC20Detailed _token) {
         token = _token;
         _setupRole(VESTING_ADMIN, msg.sender);
@@ -116,7 +128,7 @@ contract TokenVesting is Ownable, AccessControl {
     }
 
     /**
-     * @notice Add new payment plan.
+     * @notice Add new payment plan to paymentPlans array.
      * @dev Only for VESTING_ADMIN role
      * @param periodLength length of 1 period expressed in seconds
      * @param periods Total vesting periods
@@ -177,7 +189,7 @@ contract TokenVesting is Ownable, AccessControl {
         uint256 unreleased = _releasableAmount(_lock);
         require(unreleased > 0, "TokenVesting: no tokens available");
         _lock.released = _lock.released + unreleased;
-        require(token.transfer(beneficiary, unreleased));
+        require(token.transfer(beneficiary, unreleased), "TokenVesting: transfer failed");
         emit TokensReleased(beneficiary, unreleased);
     }
 
@@ -202,6 +214,7 @@ contract TokenVesting is Ownable, AccessControl {
     /**
      * @notice Getter of the vested amount for a given beneficiary user
      * @param _lock Lock structure tied to the address to lookup
+     * @return amount of vested tokens according to the lock periods passed.
      */
     function _vestedAmount(Lock storage _lock) private view returns (uint256) {
         PaymentPlan storage paymentPlan = paymentPlans[_lock.paymentPlan];
