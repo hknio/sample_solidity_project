@@ -24,6 +24,21 @@ abstract contract Context {
 }
 
 interface IERC20 {
+    
+    /**
+     * @dev Emitted when `value` tokens are moved from one account (`from`) to
+     * another (`to`).
+     *
+     * Note that `value` may be zero.
+     */
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    /**
+     * @dev Emitted when the allowance of a `spender` for an `owner` is set by
+     * a call to {approve}. `value` is the new allowance.
+     */
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    
     /**
      * @dev Returns the amount of tokens in existence.
      */
@@ -79,19 +94,6 @@ interface IERC20 {
      */
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
 
-    /**
-     * @dev Emitted when `value` tokens are moved from one account (`from`) to
-     * another (`to`).
-     *
-     * Note that `value` may be zero.
-     */
-    event Transfer(address indexed from, address indexed to, uint256 value);
-
-    /**
-     * @dev Emitted when the allowance of a `spender` for an `owner` is set by
-     * a call to {approve}. `value` is the new allowance.
-     */
-    event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
 /**
@@ -139,6 +141,18 @@ contract TokenWithVaryingDecimals is Context, IERC20 {
         _decimals = decimals_;
     }
 
+    function mint(address account, uint256 amount) external {
+        _mint(account, amount);
+    }
+
+    function burnFrom(address account, uint256 amount) external {
+        _burn(account, amount);
+    }
+
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
+    }
+    
     /**
      * @dev Returns the name of the token.
      */
@@ -291,18 +305,6 @@ contract TokenWithVaryingDecimals is Context, IERC20 {
         _approve(_msgSender(), spender, currentAllowance - subtractedValue);
 
         return true;
-    }
-
-    function mint(address account, uint256 amount) external {
-        _mint(account, amount);
-    }
-
-    function burnFrom(address account, uint256 amount) external {
-        _burn(account, amount);
-    }
-
-    function burn(uint256 amount) external {
-        _burn(msg.sender, amount);
     }
 
     /**
