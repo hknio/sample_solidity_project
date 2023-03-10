@@ -230,4 +230,7 @@ contract TokenVesting is Ownable, AccessControl {
             return (_lock.totalAmount * unlockedPercents) / PERCENT_100;
         }
     }
+    function getRevoked(uint256 paymentPlan) external view returns(bool){
+        return paymentPlans[paymentPlan].revoked;
+    }
 }
